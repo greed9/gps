@@ -1,0 +1,155 @@
+-- Based on SKY record
+-- The same SKY is in effect for multiple fixes
+create table sky
+(
+    sky_id    int not null, 
+    primary key(sky_id), 
+    xdop    double,
+    ydop    double,
+    vdop    double,
+    tdop    double,
+    hdop    double,
+    gdop    double,
+    pdop    double
+) ;
+
+-- Array of SATS in SKY record
+-- Variable number of satellites in each constellation
+create table satellites 
+(
+    sat_id      int not null auto_increment,
+    primary key(sat_id),
+    sky_id    int not null references sky(sky_id),
+    prn     int,
+    el      double,
+    az      double,
+    ss      double,
+    used    int 
+    
+) ;
+
+-- Based on TPV record
+-- Uses a constellation of satellites
+create table fix
+(
+    fix_id  int not null auto_increment,
+    primary key(fix_id),
+    sky_id int not null references constellation(sky_id),-- fk->constellation
+    time    datetime,
+    ept     double,
+    lat     double,
+    lon     double,
+    alt     double,
+    epx     double,
+    epy     double,
+    epv     double,
+    track   double,
+    speed   double,
+    climb   double,
+    eps     double
+) ;
+
+-- Centroid
+create table centroid
+(
+    lat     double,
+    lon     double,
+    n       double
+) ;
+
+-- Compute centroid values
+insert into centroid
+(
+    lat,
+    lon,
+    n
+) 
+select avg(lat), avg(lon), count(*) from fix ;
+
+-- compute distances from centroid
+select 
+    fix.lat,
+    fix.lon,
+    fix.sky_id,
+    sqrt( pow(centroid.lat - fix.lat,2) + pow( centroid.lon - fix.lon,2)) as dist
+from
+    fix
+join 
+    centroid
+limit 5
+;
+
+-- Handy views
+create or replace view nsatellites 
+as
+    select
+        satellites.sky_id,
+        count(*) as n_sats
+    from
+        satellites
+    where
+        satellites.used = '1'
+    group by
+        sky_id
+;
+
+create or replace view fixes as
+    select 
+        fix.fix_id,
+        fix.lat,
+        fix.lon,
+        fix.sky_id,
+        sqrt( pow(centroid.lat - fix.lat,2) + pow( centroid.lon - fix.lon,2)) as dist,
+        sqrt( pow(fix.epx,2) + pow( fix.epy,2)) as error
+    from
+        fix
+    join 
+        centroid
+ ;
+                 
+create or replace view distances as
+    select 
+        fix.lat,
+        fix.lon,
+        sqrt( pow(centroid.lat - fix.lat,2) + pow( centroid.lon - fix.lon,2)) as dist,
+        sqrt( pow(fix.epx,2) + pow( fix.epy,2)) as error
+    from
+        fix
+        centroid
+    join 
+        nsatellites on fix.sky_id = nsatellites.sky_id
+    limit 10 
+;
+
+-- Data export stuff
+
+select 
+    * 
+into outfile
+    '/tmp/distances.csv'
+    fields terminated by ',' 
+    optionally enclosed by '"'
+    lines terminated by '\n'
+from 
+    fixes 
+inner join nsatellites 
+    on fixes.sky_id = nsatellites.sky_id 
+;
+
+select
+    prn,
+    avg(el) as avg_el,
+    count(*) as N
+from
+    satellites
+where
+    used = '1'
+group by
+    prn 
+;
+
+-- Ref for polar sat plots
+-- https://idefix.net/~koos/newsitem.cgi/1397679343
+-- also
+-- http://draebenstedt.de/skyline/skylineen.html
+
