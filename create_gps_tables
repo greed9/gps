@@ -84,7 +84,8 @@ create or replace view nsatellites
 as
     select
         satellites.sky_id,
-        count(*) as n_sats
+        count(ss) n_sats,
+        avg(ss)
     from
         satellites
     where
@@ -100,11 +101,14 @@ create or replace view fixes as
         fix.lon,
         fix.sky_id,
         sqrt( pow(centroid.lat - fix.lat,2) + pow( centroid.lon - fix.lon,2)) as dist,
-        sqrt( pow(fix.epx,2) + pow( fix.epy,2)) as error
+        sqrt( pow(fix.epx,2) + pow( fix.epy,2)) as error,
+        sky.pdop
     from
         fix
     join 
         centroid
+    inner join sky
+        on fix.sky_id = sky.sky_id
  ;
                  
 create or replace view distances as
@@ -115,18 +119,59 @@ create or replace view distances as
         sqrt( pow(fix.epx,2) + pow( fix.epy,2)) as error
     from
         fix
+    join
         centroid
-    join 
+    inner join 
         nsatellites on fix.sky_id = nsatellites.sky_id
     limit 10 
 ;
 
+-- errors
+create or replace view errors as
+    select
+        avg( centroid.lat - fix.lat ) as lat_error,
+        avg( centroid.lon - fix.lon ) as lon_error,
+        std( centroid.lat - fix.lat ) as lat_std,
+        std( centroid.lon - fix.lon ) as lon_std
+     from
+        fix
+     join
+        centroid
+ ;
+ 
+ -- Satellite locations
+ create or replace view sat_view as
+    select
+        fix.time,
+        satellites.prn,
+        satellites.az,
+        satellites.el,
+        satellites.ss
+     from 
+        fix
+     inner join satellites
+        on fix.sky_id = satellites.sky_id
+     order by
+        fix.time,
+        satellites.prn
+;
 -- Data export stuff
+
+select
+    *
+into outfile
+    '/tmp/sat_view.csv'
+    fields terminated by ','
+    optionally enclosed by '"'
+    lines terminated by '\n'
+from
+    sat_view
+;
 
 select 
     * 
 into outfile
-    '/tmp/distances.csv'
+    '/tmp/distances2.csv'
     fields terminated by ',' 
     optionally enclosed by '"'
     lines terminated by '\n'
