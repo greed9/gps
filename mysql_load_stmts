@@ -1,0 +1,16 @@
+load data local infile 'sky.csv'
+into table skies
+fields terminated by ','
+(location, sky_id, xdop, ydop, vdop, tdop, hdop, gdop, pdop) ;
+
+load data local infile 'fix.csv'
+into table fixes
+fields terminated by ','
+(location, sky_id, time, ept, lat, lon, alt, epx, epy, epv, track, speed, climb, eps)
+set fix_id = NULL ;
+
+load data local infile 'sat.csv'
+into table sats
+fields terminated by ','
+(location, sky_id, prn, el, az, ss, used)
+set sat_id = NULL ;
