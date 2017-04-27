@@ -1,9 +1,19 @@
+-- Trials
+create table trials
+(
+  trial     int,
+  primary key (trial),
+  info      varchar(255),
+  t_date    datetime
+) ;
+
 -- Based on SKY record
 -- The same SKY is in effect for multiple fixes
-create table sky
+create table skies
 (
-    sky_id    int not null, 
-    primary key(sky_id), 
+    trial   int not null,
+    sky_id    int not null,
+    primary key(trial, sky_id),
     xdop    double,
     ydop    double,
     vdop    double,
@@ -15,26 +25,30 @@ create table sky
 
 -- Array of SATS in SKY record
 -- Variable number of satellites in each constellation
-create table satellites 
+create table sats
 (
+    trial int not null,
     sat_id      int not null auto_increment,
     primary key(sat_id),
-    sky_id    int not null references sky(sky_id),
+    sky_id int,
+    foreign key (trial, sky_id) references skies(trial, sky_id) on delete cascade,
     prn     int,
     el      double,
     az      double,
     ss      double,
-    used    int 
-    
+    used    int
+
 ) ;
 
 -- Based on TPV record
 -- Uses a constellation of satellites
-create table fix
+create table fixes
 (
+    trial    int,
     fix_id  int not null auto_increment,
     primary key(fix_id),
-    sky_id int not null references constellation(sky_id),-- fk->constellation
+    sky_id int,
+    foreign key(trial, sky_id) references skies(trial, sky_id) on delete cascade,
     time    datetime,
     ept     double,
     lat     double,
@@ -52,9 +66,20 @@ create table fix
 -- Centroid
 create table centroid
 (
+    trial   int,
+    primary key (trial),
     lat     double,
     lon     double,
     n       double
+) ;
+
+-- Trials
+create table Trials
+(
+  trial     int,
+  primary key (trial),
+  info      varchar(255),
+  t_date    datetime
 ) ;
 
 -- Compute centroid values
@@ -63,24 +88,24 @@ insert into centroid
     lat,
     lon,
     n
-) 
+)
 select avg(lat), avg(lon), count(*) from fix ;
 
 -- compute distances from centroid
-select 
+select
     fix.lat,
     fix.lon,
     fix.sky_id,
     sqrt( pow(centroid.lat - fix.lat,2) + pow( centroid.lon - fix.lon,2)) as dist
 from
     fix
-join 
+join
     centroid
 limit 5
 ;
 
 -- Handy views
-create or replace view nsatellites 
+create or replace view nsatellites
 as
     select
         satellites.sky_id,
@@ -95,7 +120,7 @@ as
 ;
 
 create or replace view fixes as
-    select 
+    select
         fix.fix_id,
         fix.lat,
         fix.lon,
@@ -105,14 +130,14 @@ create or replace view fixes as
         sky.pdop
     from
         fix
-    join 
+    join
         centroid
     inner join sky
         on fix.sky_id = sky.sky_id
  ;
-                 
+
 create or replace view distances as
-    select 
+    select
         fix.lat,
         fix.lon,
         sqrt( pow(centroid.lat - fix.lat,2) + pow( centroid.lon - fix.lon,2)) as dist,
@@ -121,9 +146,9 @@ create or replace view distances as
         fix
     join
         centroid
-    inner join 
+    inner join
         nsatellites on fix.sky_id = nsatellites.sky_id
-    limit 10 
+    limit 10
 ;
 
 -- errors
@@ -138,7 +163,7 @@ create or replace view errors as
      join
         centroid
  ;
- 
+
  -- Satellite locations
  create or replace view sat_view as
     select
@@ -147,7 +172,7 @@ create or replace view errors as
         satellites.az,
         satellites.el,
         satellites.ss
-     from 
+     from
         fix
      inner join satellites
         on fix.sky_id = satellites.sky_id
@@ -168,17 +193,17 @@ from
     sat_view
 ;
 
-select 
-    * 
+select
+    *
 into outfile
     '/tmp/distances2.csv'
-    fields terminated by ',' 
+    fields terminated by ','
     optionally enclosed by '"'
     lines terminated by '\n'
-from 
-    fixes 
-inner join nsatellites 
-    on fixes.sky_id = nsatellites.sky_id 
+from
+    fixes
+inner join nsatellites
+    on fixes.sky_id = nsatellites.sky_id
 ;
 
 select
@@ -190,11 +215,10 @@ from
 where
     used = '1'
 group by
-    prn 
+    prn
 ;
 
 -- Ref for polar sat plots
 -- https://idefix.net/~koos/newsitem.cgi/1397679343
 -- also
 -- http://draebenstedt.de/skyline/skylineen.html
-
