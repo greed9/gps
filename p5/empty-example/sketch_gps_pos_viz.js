@@ -27,7 +27,7 @@ function setup ( ){
   createCanvas( 400, 400 ) ;
   background( 0 ) ;
   
-  currWindow = new DataSeries( 100 ) ;
+  currWindow = new DataSeries( 50 ) ;
   
   // In constrast to RBG, HSV allows us to adjust the "hotness" of colors to correspond
   // to altitudes. This allows 100 possible shades of color
@@ -39,6 +39,19 @@ function setup ( ){
 
   // Use a window of 100 points for now
   currWindow = new DataSeries ( 500 ) ;
+  
+  // reference points
+  var westLong = map ( minLon, minLon, maxLon, 5, width - 5) ;
+  var eastLong = map ( maxLon, minLon, maxLon, 5, width - 20) ;
+  var northLat = map( minLat, minLat, maxLat, 20, height ) ;
+  var southLat = map( maxLat, minLat, maxLat, 5, height - 20 ) ;
+  fill( 10, 100, 100 ) ;
+  textSize ( 32 ) ;
+  text ( "W", westLong, 200 ) ;
+  text( "E", eastLong, 200 ) ;
+  text ( "N", width / 2, northLat, 40 ) ;
+  text ( "S", width / 2, southLat, 20 ) ;
+  //rect ( eastLong, 200, 10, 10 ) ;
 }
 
 // Loop through the data
@@ -50,9 +63,9 @@ function draw ( ){
   var pdop = float ( fields[6] ) ; // pdop for this fix
   
   // Scale lat and lon -- could be backwards, flipped, etc?
-  var x = map( lat, minLat, maxLat, 0, height ) ;
-  var y = map ( lon, maxLon, minLon, 0, width ) ;
-  var p = map ( pdop, 0, 10, 0, width ) ;
+  var y = map( lat, minLat, maxLat, 0, height ) ;
+  var x = map ( lon, minLon, maxLon, 0, width ) ;
+  var p = map ( pdop, 0, 10, 0, 100 ) ;
   
   // Capture the newest data point
   var dp = new DataPoint ( x, y, p) ;
@@ -74,7 +87,7 @@ function plotCurrentWindow ( dp ){
   currWindow.add ( dp ) ;
   
   // Clear the old image
-  background ( 0 ) ;
+  //background ( 0 ) ;
   
   // Set up to fade older lines
   var bright = 100 ;
@@ -86,13 +99,14 @@ function plotCurrentWindow ( dp ){
   // Rest of data, newer to older
   while ( tmp != null )
   {
+    strokeColor = tmp.n ;
     stroke( strokeColor, 100, bright ) ;
     line( centroidX, centroidY, tmp.x, tmp.y ) ;
-    var barY = height - 50 ;
-    var barX = width / 2 ;
-    stroke( gaugeColor, 100, 100 ) ;
-    strokeWeight( 4 ) ;
-    line( barX - (tmp.n / 2), barY, barX + ( tmp.n / 2), barY ) ;
+    //var barY = height - 50 ;
+    //var barX = width / 2 ;
+    //stroke( gaugeColor, 100, 100 ) ;
+    //strokeWeight( 4 ) ;
+    //line( barX - (tmp.n / 2), barY, barX + ( tmp.n / 2), barY ) ;
     strokeWeight ( 1 ) ;
     stroke( strokeColor, 100, bright ) ;
     //rect( barX, barY, 5, tmp.n * 10 ) ;
@@ -120,8 +134,7 @@ function DataSeries ( pMaxElements ) {
   this.maxElements = pMaxElements ;
   this.points = [] ;
   
-  this.getNElements = function( )
-  {
+  this.getNElements = function( ) {
     return points.length ;
   }
 
@@ -139,8 +152,7 @@ function DataSeries ( pMaxElements ) {
 
   // iterate, back to front
   this.prev = function ( ) {
-    if ( this.currentDataPoint > 0 )
-    {
+    if ( this.currentDataPoint > 0 )  {
       var tmp = this.points[this.currentDataPoint] ;
       this.currentDataPoint -- ;
       return tmp ;
@@ -153,13 +165,11 @@ function DataSeries ( pMaxElements ) {
   // or null if at end of list
   // Iterate front to back
   this.next = function ( ) {
-    if ( this.currentDataPoint < this.points.length - 1 )
-    {
+    if ( this.currentDataPoint < this.points.length - 1 ) {
       var tmp =  this.points.get[this.currentDataPoint] ;
       this.currentDataPoint ++ ;
       return tmp ;
-    } else
-    {
+    } else {
       return null ;
     }
   }
@@ -168,13 +178,9 @@ function DataSeries ( pMaxElements ) {
   // Delete element at head (oldest)
   this.add = function ( pDp ) {
 
-    if ( this.points.length < this.maxElements )
-    {
-      this.points.push( pDp ) ;
-    } else {
-      var tmp = this.points[this.points.length - 1] ;
-      this.points.pop ( 0 ) ;
-      this.points.push ( pDp ) ;
-    }
+    if ( this.points.length >= this.maxElements ) {
+     this.points.shift ( ) ;
+    } 
+    this.points.push( pDp ) ;
   }
 } ;
