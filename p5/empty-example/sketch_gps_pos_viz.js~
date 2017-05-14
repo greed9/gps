@@ -1,0 +1,180 @@
+// *****************************************************
+// show positions calculated from gps over time
+// *****************************************************
+var lines= [] ;              // Holds lines from file read with loadStrings ( )
+var fields = [] ;             // Split each line into these, using spaces as a delimiter
+var lineNo = 0 ;
+var minLat = 28.688676667 ;
+var maxLat = 28.689081667 ;
+var minLon = -81.515453333 ;
+var maxLon = -81.515078333 ;
+var centroidLat = 28.68889551140758 ;
+var centroidLon = -81.51523422841227 ;
+var centroidY = 0 ;
+var centroidX = 0 ;
+var strokeColor = 50 ;
+var gaugeColor = 344 ;
+var currWindow ;
+
+// Load the data synchronously
+function preload ( ) {
+    // Read in all the data
+    lines = loadStrings ( "./distances2.csv" ) ;
+}
+
+// One time stuff here
+function setup ( ){
+  createCanvas( 400, 400 ) ;
+  background( 0 ) ;
+  
+  currWindow = new DataSeries( 100 ) ;
+  
+  // In constrast to RBG, HSV allows us to adjust the "hotness" of colors to correspond
+  // to altitudes. This allows 100 possible shades of color
+  colorMode ( HSB, 100, 100, 100 ) ;
+  
+  // Scale the centroid
+  centroidY = map( centroidLat, minLat, maxLat, 0, height ) ;
+  centroidX = map ( centroidLon, maxLon, minLon, 0, width ) ;
+
+  // Use a window of 100 points for now
+  currWindow = new DataSeries ( 100 ) ;
+}
+
+// Loop through the data
+function draw ( ){
+  // Parse fields
+  fields = splitTokens( lines[lineNo], "," ) ;
+  var lat = float ( fields[1] ) ;
+  var lon = float ( fields[2] ) ;
+  var pdop = float ( fields[6] ) ; // pdop for this fix
+  
+  // Scale lat and lon -- could be backwards, flipped, etc?
+  var x = map( lat, minLat, maxLat, 0, height ) ;
+  var y = map ( lon, maxLon, minLon, 0, width ) ;
+  var p = map ( pdop, 0, 10, 0, width ) ;
+  
+  // Capture the newest data point
+  var dp = new DataPoint ( x, y, p) ;
+  
+  // Plot the points in the current window
+  plotCurrentWindow ( dp ) ;
+  
+  // Go until we run out of input lines
+  if ( lineNo < lines.length )
+  {
+    lineNo ++ ;
+  }
+}
+
+// Add dp to queue, iterate backwards through the DataSeries,
+// Plotting each line from the centroid to the data point
+function plotCurrentWindow ( dp ){
+  // append newest data point
+  currWindow.add ( dp ) ;
+  
+  // Clear the old image
+  background ( 0 ) ;
+  
+  // Set up to fade older lines
+  var bright = 100 ;
+  var tmp = currWindow.last ( ) ;
+  
+  // Current line is fat
+  strokeWeight ( 4 ) ;
+  
+  // Rest of data, newer to older
+  while ( tmp != null )
+  {
+    stroke( strokeColor, 100, bright ) ;
+    line( centroidX, centroidY, tmp.x, tmp.y ) ;
+    var barY = height - 50 ;
+    var barX = width / 2 ;
+    stroke( gaugeColor, 100, 100 ) ;
+    strokeWeight( 4 ) ;
+    line( barX - (tmp.n / 2), barY, barX + ( tmp.n / 2), barY ) ;
+    strokeWeight ( 1 ) ;
+    stroke( strokeColor, 100, bright ) ;
+    //rect( barX, barY, 5, tmp.n * 10 ) ;
+    //println ( tmp.n ) ;
+    tmp = currWindow.prev ( ) ;
+    
+    // Fade the older lines progressively
+    bright -= 1 ;
+    strokeWeight ( 1 ) ;
+
+  }
+}
+
+// Single data point converted from Java/Processing class
+function DataPoint ( pRawValueX, pRawValueY, pNsats ) {
+  this.x = pRawValueX ;
+  this.y = pRawValueY ; 
+  this.n = pNsats ;
+} ;
+
+// Collection of Data Points
+function DataSeries ( pMaxElements ) {
+  
+  this.currentDataPoint = 0 ;
+  this.maxElements = pMaxElements ;
+  this.points = [] ;
+  
+  this.getNElements = function( )
+  {
+    return points.length ;
+  }
+
+  // Return the first data point in the ArrayList
+  this.first = function( ) {
+    this.currentDataPoint = 0 ;
+    return this.next ( ) ;
+  }
+  
+  // Return the last data point in the series
+  this.last = function ( ) {
+    this.currentDataPoint = this.points.length - 1  ;
+    return this.prev ( ) ;
+  }
+
+  // iterate, back to front
+  this.prev = function ( ) {
+    if ( this.currentDataPoint > 0 )
+    {
+      var tmp = this.points[this.currentDataPoint] ;
+      this.currentDataPoint -- ;
+      return tmp ;
+    } else {
+      return null ;
+    }
+  }
+  
+  // Return the next data point in the ArrayList
+  // or null if at end of list
+  // Iterate front to back
+  this.next = function ( ) {
+    if ( this.currentDataPoint < this.points.length - 1 )
+    {
+      var tmp =  this.points.get[this.currentDataPoint] ;
+      this.currentDataPoint ++ ;
+      return tmp ;
+    } else
+    {
+      return null ;
+    }
+  }
+
+  // Add (append) a datapoint to the back of the queue
+  // Delete element at head (oldest)
+  this.add = function ( pDp ) {
+
+    if ( this.points.length < this.maxElements )
+    {
+      this.points.push( pDp ) ;
+    } else {
+      var tmp = this.points[this.points.length - 1] ;
+      this.points.pop ( 0 ) ;
+      this.points.push ( pDp ) ;
+    }
+  }
+} ;
